@@ -56,7 +56,7 @@ def read_save(arduino, save_path):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--port", default="/dev/ttyUSB0", help="Arduino port")
+    parser.add_argument("--port", default="COM6", help="Arduino port")
     parser.add_argument("--baud", default=115200, help="Arduino baud rate")
     parser.add_argument(
         "--save-path",
@@ -83,12 +83,14 @@ if __name__ == "__main__":
     arduino = serial.Serial(port, baud, timeout=0.01)
 
     print(f"live_plot: {live_plot}")
-    if live_plot == "True":
+    if live_plot == True:
+        print("Creating figure")
         fig, axs = plt.subplots(nrows=2)
         ts = []
         temps = []
         sets = []
         heaters = []
+        percents = []
 
         def animate(i, ts, temps, sets, heaters):
             t, temp, setpoint, heater_percent, heater_PWM = read_save(
@@ -100,6 +102,7 @@ if __name__ == "__main__":
             temps.append(temp)
             sets.append(setpoint)
             heaters.append(heater_PWM)
+            percents.append(heater_percent)
             if live_plot_n > 0:
                 ts = ts[-live_plot_n:]
                 temps = temps[-live_plot_n:]
@@ -110,16 +113,17 @@ if __name__ == "__main__":
             axs[0].plot(ts, sets, color="red")
             axs[1].clear()
             axs[1].plot(ts, heaters, color="k")
+            axs[1].plot(ts, percents, color="r")
             arduino.flush()
 
         ani = animation.FuncAnimation(
             fig,
             animate,
             fargs=(ts, temps, sets, heaters),
-            interval=400,
+            interval=40,
         )
         plt.show()
-
+        print("showing figure")
     else:
         while True:
             t, temp, setpoint, heater_percent, heater_PWM = read_save(

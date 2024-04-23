@@ -14,21 +14,36 @@ double temp_prev = 0;
 
 // CONTROL
 const int potPIN = A0; // potentiometer to set the temperature
+int pot_val; // value of the potentiometer
+double set_temp; // set temperature
 const int heaterPINhot = A1; // peltier PWM control pin
 const int heaterPINcool = A2; // peltier PWM control pin
-int pot_val;
-double set_temp; // set temperature
-double heater_percent; //
-double heater_PWM = 0; // peltier control
-double KP = 40;
-double KI = 0.01;
-double KD = 10;
-AutoPID myPID(&temp, &set_temp, &heater_PWM, -255., +255., KP, KI, KD);
-
+unsigned long window = 10*1000; // window time in milliseconds
+unsigned long now; // current time
+unsigned long window_start; // time of current window start
+double heater_percent; // percent of window time when Peltier should be ON
+int heater_ONOFF = 0; // peltier control
+double KP = 0.15;
+double KI = 0.0001;//0.01;
+double KD = 0;//10;
+AutoPID myPID(&temp, &set_temp, &heater_percent, 0., 1., KP, KI, KD); // PID on the percent of window time during which peltier is ON
 
 // DISPLAY
 const int rs = 2, en = 3, d4 = 4, d5 = 5, d6 = 6, d7 = 7;
 LiquidCrystal lcd(rs, en, d4, d5, d6, d7);
+
+void PeltierControl(int onoff){
+  if (onoff > 0) {
+    analogWrite(heaterPINcool,0);
+    analogWrite(heaterPINhot, 255);
+  } else if (onoff < 0) {
+    analogWrite(heaterPINcool, 255);
+    analogWrite(heaterPINhot, 0);
+  } else {
+    analogWrite(heaterPINcool, 0);
+    analogWrite(heaterPINhot, 0);
+  }
+}
 
 
 void setup() {
@@ -63,16 +78,14 @@ void setup() {
   //myPID.setTimeStep(4000);
   pinMode(heaterPINhot, OUTPUT);
   pinMode(heaterPINcool, OUTPUT);
-  analogWrite(heaterPINhot, 0);
-  analogWrite(heaterPINcool, 0);
+  PeltierControl(0);
+  window_start = millis();
 }
 
 void loop() {
 
   // GET REAL TEMP
   temp = maxthermo.readThermocoupleTemperature();
-  //Serial.print("Thermocouple = ");
-  //Serial.println(temp);
   // Check and print any faults
   uint8_t fault = maxthermo.readFault();
   if (fault) {
@@ -100,17 +113,18 @@ void loop() {
 
   // PID
   myPID.run();
-  //heater_percent = map(pot_val, 0,1023, 0,100);
-  //heater_PWM = map(heater_percent, 0,100, -255,+255);
-  if (heater_PWM >= 0) {
-    analogWrite(heaterPINcool,0);
-    analogWrite(heaterPINhot, round(heater_PWM));
-  } else {
-    analogWrite(heaterPINcool,round(-heater_PWM));
-    analogWrite(heaterPINhot, 0);
-  }
-  //analogWrite(heaterPIN, heater_PWM);
 
+  // Peltier Control
+  now = millis();
+  if (now > window_start + window){
+      heater_ONOFF = 0;
+      window_start = now;
+  } else if (now > window_start + heater_percent*window){
+      heater_ONOFF = 0;    
+  } else {
+      heater_ONOFF = 1;
+  }
+  PeltierControl(heater_ONOFF);
 
   // DISPLAY
   lcd.clear();
@@ -128,7 +142,7 @@ void loop() {
   lcd.setCursor(8,1);
   lcd.print("PWM:");
   //lcd.print((int) heater_percent);
-  lcd.print((int) heater_PWM);
+  lcd.print(heater_percent, 3);
   //lcd.print("%");
 
   // SERIAL
@@ -137,7 +151,7 @@ void loop() {
   //Serial.print(",");Serial.print(temp_smooth);
   Serial.print(",");Serial.print(set_temp);
   Serial.print(",");Serial.print(heater_percent);
-  Serial.print(",");Serial.println(heater_PWM);
+  Serial.print(",");Serial.println(heater_ONOFF);
   
-  delay(500);
+  delay(50);
 }
