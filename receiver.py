@@ -66,7 +66,7 @@ if __name__ == "__main__":
     parser.add_argument("--live-plot", default=True, help="Toggle live plot")
     parser.add_argument(
         "--live-plot-n",
-        default=0,
+        default=5000,
         help="Max number of points to plot",
     )
     args = parser.parse_args()
@@ -92,7 +92,7 @@ if __name__ == "__main__":
         heaters = []
         percents = []
 
-        def animate(i, ts, temps, sets, heaters):
+        def animate(i, ts, temps, sets, heaters, percents):
             t, temp, setpoint, heater_percent, heater_PWM = read_save(
                 arduino, save_path
             )
@@ -108,6 +108,7 @@ if __name__ == "__main__":
                 temps = temps[-live_plot_n:]
                 sets = sets[-live_plot_n:]
                 heaters = heaters[-live_plot_n:]
+                percents = percents[-live_plot_n:]
             axs[0].clear()
             axs[0].plot(ts, temps, color="k")
             axs[0].plot(ts, sets, color="red")
@@ -119,7 +120,7 @@ if __name__ == "__main__":
         ani = animation.FuncAnimation(
             fig,
             animate,
-            fargs=(ts, temps, sets, heaters),
+            fargs=(ts, temps, sets, heaters, percents),
             interval=40,
         )
         plt.show()
